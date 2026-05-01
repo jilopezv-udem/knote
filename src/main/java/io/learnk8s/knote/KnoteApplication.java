@@ -9,11 +9,8 @@ import org.commonmark.node.Node;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -63,7 +60,6 @@ class Note {
 }
 
 @Configuration
-@EnableConfigurationProperties(KnoteProperties.class)
 class KnoteConfig implements WebMvcConfigurer {
 
     @Autowired
@@ -81,15 +77,6 @@ class KnoteConfig implements WebMvcConfigurer {
 
 }
 
-@ConfigurationProperties(prefix = "knote")
-class KnoteProperties {
-    @Value("${uploadDir:/tmp/uploads/}")
-    private String uploadDir;
-
-    public String getUploadDir() {
-        return uploadDir;
-    }
-}
 
 @Controller
 class KNoteController {
@@ -140,16 +127,33 @@ class KNoteController {
     }
 
     private void uploadImage(MultipartFile file, String description, Model model) throws Exception {
-        File uploadsDir = new File(properties.getUploadDir());
-        if (!uploadsDir.exists()) {
-            uploadsDir.mkdir();
-        }
-        String fileId = UUID.randomUUID().toString() + "." +
-                file.getOriginalFilename().split("\\.")[1];
-        file.transferTo(new File(properties.getUploadDir() + fileId));
-        model.addAttribute("description",
-                description + " ![](/uploads/" + fileId + ")");
+
+    File uploadsDir = new File(properties.getUploadDir());
+
+    if (!uploadsDir.exists()) {
+        uploadsDir.mkdirs();
     }
+
+    // Obtener extensión de forma segura
+    String originalName = file.getOriginalFilename();
+    String extension = "";
+
+    if (originalName != null && originalName.contains(".")) {
+        extension = originalName.substring(originalName.lastIndexOf("."));
+    }
+
+    String fileId = UUID.randomUUID().toString() + extension;
+
+    // Usar el directorio correctamente
+    File destination = new File(uploadsDir, fileId);
+
+    file.transferTo(destination);
+
+    model.addAttribute("description",
+            description + " ![](/uploads/" + fileId + ")");
+}
+
+
 
     private void saveNote(String description, Model model) {
         if (description != null && !description.trim().isEmpty()) {
